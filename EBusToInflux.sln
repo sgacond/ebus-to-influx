@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31815.197
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EBusToInflux", "EBusToInflux\EBusToInflux.csproj", "{FEE87398-2B59-4CE3-BD89-77D383B08D9A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EBusToInflux.Tests", "EBusToInflux.Tests\EBusToInflux.Tests.csproj", "{9F41ADD0-843D-4D18-9A40-D2F1FAB5561D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FEE87398-2B59-4CE3-BD89-77D383B08D9A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FEE87398-2B59-4CE3-BD89-77D383B08D9A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FEE87398-2B59-4CE3-BD89-77D383B08D9A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FEE87398-2B59-4CE3-BD89-77D383B08D9A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9F41ADD0-843D-4D18-9A40-D2F1FAB5561D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9F41ADD0-843D-4D18-9A40-D2F1FAB5561D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9F41ADD0-843D-4D18-9A40-D2F1FAB5561D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9F41ADD0-843D-4D18-9A40-D2F1FAB5561D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {E52F8B81-D40C-4A1A-9F4D-515DE36562A2}
+	EndGlobalSection
+EndGlobal
