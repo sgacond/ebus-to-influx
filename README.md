@@ -29,12 +29,18 @@ Note: in normal operation the control unit only polls outside, flow, hot water a
 
 ### Docker (NAS)
 
+On every push to `main`, the GitHub Action (`.github/workflows/build.yml`) runs the tests and publishes a multi-arch image (amd64 and arm64) to `ghcr.io/sgacond/ebus-to-influx:latest`. Tags `v*` additionally publish a versioned image.
+
+On the NAS only `compose.yaml` and a `.env` are needed:
+
 ```
 cp .env.example .env    # and set INFLUX_TOKEN
-docker compose up -d --build
+docker compose pull && docker compose up -d
 ```
 
 If the `.local` host names don't resolve inside the container, set `EBus__Host` and `Influx__Url` to IP addresses in `compose.yaml`.
+
+Build locally: `docker build -t ebus-to-influx .`
 
 ## Hardware
 

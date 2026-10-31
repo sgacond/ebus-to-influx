@@ -1,7 +1,8 @@
 services:
   ebus-to-influx:
-    build: .
+    image: ghcr.io/sgacond/ebus-to-influx:latest
     restart: unless-stopped
     environment:
+      TZ: Europe/Zurich
       # everything from appsettings.json can be overridden here, e.g. EBus__Host or Influx__Url
       Influx__Token: ${INFLUX_TOKEN:?set INFLUX_TOKEN in .env}
