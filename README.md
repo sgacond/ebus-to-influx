@@ -156,24 +156,24 @@ Not identified: `0x0199` (409) = 38.1; `0x065D` (1629) = 512; `0x065E`, `0x065F`
 | `0x06B4` | 1716 | room target (active?) | °C | 10 | confirmed | follows Raumsoll Heiz |
 | `0x06B6` | 1718 | WP Leistung | % | 10 | confirmed | 75 |
 | `0x06B8` | 1720 | +/- VL HK 1 Heiz | °C | 10 | confirmed | -4.0 |
-| `0x06BF` | 1727 | Raumsoll Heiz | °C | 10 | likely | 22.0 |
+| `0x06BF` | 1727 | Raumsoll Heiz | °C | 10 | confirmed | 22.0 |
 | `0x06C1` | 1729 | Absenk Raum Heiz | °C | 10 | confirmed | 16.0 |
 | `0x06C2` | 1730 | Raumsoll Kühl | °C | 10 | confirmed | 23.5 |
-| `0x06C4` | 1732 | Absenk Raum Kühl | °C | 10 | likely | 28.0 |
+| `0x06C4` | 1732 | Absenk Raum Kühl | °C | 10 | confirmed | 28.0 |
 | `0x06D1` | 1745 | Grenztemp WP | °C | 10 | confirmed (by elimination) | -5.0 |
-| `0x06D4` | 1748 | Hysterese VL (2. WE) | K | 10 | likely | 3.0 |
+| `0x06D4` | 1748 | Hysterese VL (2. WE) | K | 10 | confirmed | 3.0 |
 | `0x06D5` | 1749 | Bivalenztemp | °C | 10 | confirmed | -5.0 |
-| `0x06D6` | 1750 | Verzögerung (2. WE) | min | 1 | likely | 10 |
+| `0x06D6` | 1750 | Verzögerung (2. WE) | min | 1 | confirmed | 10 |
 | `0x06DD` | 1757 | Therm Desinfekt Solltemp | °C | 10 | confirmed | 65.0 |
 | `0x06DF` | 1759 | Therm Desinfekt Uhrzeit | h | 1 | confirmed | 14 |
 | `0x06E0` | 1760 | Therm Desinfekt Dauer | min | 1 | confirmed | 30 |
 | `0x06E1` | 1761 | Therm Desinfekt Max Zeit | h | 1 | confirmed | 4 |
 | `0x06EB` | 1771 | Heizkennlinie Aussen Min | °C | 10 | confirmed | -7.0 |
-| `0x06EC` | 1772 | Heizkennlinie Aussen Max | °C | 10 | likely | 18.0 |
+| `0x06EC` | 1772 | Heizkennlinie Aussen Max | °C | 10 | confirmed | 18.0 |
 | `0x06ED` | 1773 | Heizkennlinie Min Vorlauf HK 1 | °C | 10 | confirmed | 23.0 |
 | `0x06EE` | 1774 | Heizkennlinie Max Vorlauf HK 1 | °C | 10 | confirmed | 37.0 |
 | `0x06EF` | 1775 | Kühlkennlinie Aussen Max | °C | 10 | confirmed | 40.0 |
-| `0x06F0` | 1776 | Kühlkennlinie Aussen Min | °C | 10 | likely | 22.0 |
+| `0x06F0` | 1776 | Kühlkennlinie Aussen Min | °C | 10 | confirmed | 22.0 |
 | `0x06F1` | 1777 | Kühlkennlinie Min Vorlauf HK 1 | °C | 10 | confirmed | 18.0 |
 | `0x06F2` | 1778 | Kühlkennlinie Max Vorlauf HK 1 | °C | 10 | confirmed | 18.0 |
 | `0x06F3` | 1779 | Kühlkennlinie Min Vorlauf HK 2 | °C | 10 | confirmed | 18.0 |
