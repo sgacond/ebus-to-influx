@@ -53,9 +53,9 @@ internal static class WeishauptParameters
         [0x06C1] = new("ReducedRoomTargetHeating", "Absenk Raum Heiz", Celsius),
         [0x06C2] = new("RoomTargetCooling", "Raumsoll Kühl", Celsius),
         [0x06C4] = new("ReducedRoomTargetCooling", "Absenk Raum Kühl", Celsius, Confirmed: false),
-        [0x06D1] = new("BivalenceTemperature", "Bivalenztemp", Celsius, Confirmed: false), // or 0x06D5
+        [0x06D1] = new("HeatPumpLimitTemperature", "Grenztemp WP", Celsius), // by elimination
         [0x06D4] = new("SecondHeaterFlowHysteresis", "Hysterese VL", "K", Confirmed: false),
-        [0x06D5] = new("HeatPumpLimitTemperature", "Grenztemp WP", Celsius, Confirmed: false), // or 0x06D1
+        [0x06D5] = new("BivalenceTemperature", "Bivalenztemp", Celsius),
         [0x06D6] = new("SecondHeaterDelay", "Verzögerung", "min", Divisor: 1, Confirmed: false),
         [0x06DD] = new("DisinfectionTarget", "Therm Desinfekt Solltemp", Celsius),
         [0x06DF] = new("DisinfectionHour", "Therm Desinfekt Uhrzeit", "h", Divisor: 1),
@@ -67,10 +67,10 @@ internal static class WeishauptParameters
         [0x06EE] = new("HeatingCurveMaxFlowHc1", "Heizkennlinie Max Vorlauf HK 1", Celsius),
         [0x06EF] = new("CoolingCurveOutsideMax", "Kühlkennlinie Aussen Max", Celsius),
         [0x06F0] = new("CoolingCurveOutsideMin", "Kühlkennlinie Aussen Min", Celsius, Confirmed: false),
-        [0x06F1] = new("CoolingCurveMinFlowHc1", "Kühlkennlinie Min Vorlauf HK 1", Celsius, Confirmed: false),
-        [0x06F2] = new("CoolingCurveMaxFlowHc1", "Kühlkennlinie Max Vorlauf HK 1", Celsius, Confirmed: false),
-        [0x06F3] = new("CoolingCurveMinFlowHc2", "Kühlkennlinie Min Vorlauf HK 2", Celsius, Confirmed: false),
-        [0x06F4] = new("CoolingCurveMaxFlowHc2", "Kühlkennlinie Max Vorlauf HK 2", Celsius, Confirmed: false),
+        [0x06F1] = new("CoolingCurveMinFlowHc1", "Kühlkennlinie Min Vorlauf HK 1", Celsius),
+        [0x06F2] = new("CoolingCurveMaxFlowHc1", "Kühlkennlinie Max Vorlauf HK 1", Celsius),
+        [0x06F3] = new("CoolingCurveMinFlowHc2", "Kühlkennlinie Min Vorlauf HK 2", Celsius),
+        [0x06F4] = new("CoolingCurveMaxFlowHc2", "Kühlkennlinie Max Vorlauf HK 2", Celsius),
         [0x06F5] = new("HeatingCurveMinFlowHc2", "Heizkennlinie Min Vorlauf HK 2", Celsius),
         [0x06F6] = new("HeatingCurveMaxFlowHc2", "Heizkennlinie Max Vorlauf HK 2", Celsius),
     };

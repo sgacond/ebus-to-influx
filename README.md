@@ -160,8 +160,9 @@ Not identified: `0x0199` (409) = 38.1; `0x065D` (1629) = 512; `0x065E`, `0x065F`
 | `0x06C1` | 1729 | Absenk Raum Heiz | °C | 10 | confirmed | 16.0 |
 | `0x06C2` | 1730 | Raumsoll Kühl | °C | 10 | confirmed | 23.5 |
 | `0x06C4` | 1732 | Absenk Raum Kühl | °C | 10 | likely | 28.0 |
-| `0x06D1` / `0x06D5` | 1745 / 1749 | Bivalenztemp / Grenztemp WP | °C | 10 | likely, order unclear | -5.0 each |
+| `0x06D1` | 1745 | Grenztemp WP | °C | 10 | confirmed (by elimination) | -5.0 |
 | `0x06D4` | 1748 | Hysterese VL (2. WE) | K | 10 | likely | 3.0 |
+| `0x06D5` | 1749 | Bivalenztemp | °C | 10 | confirmed | -5.0 |
 | `0x06D6` | 1750 | Verzögerung (2. WE) | min | 1 | likely | 10 |
 | `0x06DD` | 1757 | Therm Desinfekt Solltemp | °C | 10 | confirmed | 65.0 |
 | `0x06DF` | 1759 | Therm Desinfekt Uhrzeit | h | 1 | confirmed | 14 |
@@ -173,7 +174,10 @@ Not identified: `0x0199` (409) = 38.1; `0x065D` (1629) = 512; `0x065E`, `0x065F`
 | `0x06EE` | 1774 | Heizkennlinie Max Vorlauf HK 1 | °C | 10 | confirmed | 37.0 |
 | `0x06EF` | 1775 | Kühlkennlinie Aussen Max | °C | 10 | confirmed | 40.0 |
 | `0x06F0` | 1776 | Kühlkennlinie Aussen Min | °C | 10 | likely | 22.0 |
-| `0x06F1`–`0x06F4` | 1777–1780 | Kühlkennlinie Min/Max Vorlauf HK 1/2 | °C | 10 | likely, order assumed | 18.0 each |
+| `0x06F1` | 1777 | Kühlkennlinie Min Vorlauf HK 1 | °C | 10 | confirmed | 18.0 |
+| `0x06F2` | 1778 | Kühlkennlinie Max Vorlauf HK 1 | °C | 10 | confirmed | 18.0 |
+| `0x06F3` | 1779 | Kühlkennlinie Min Vorlauf HK 2 | °C | 10 | confirmed | 18.0 |
+| `0x06F4` | 1780 | Kühlkennlinie Max Vorlauf HK 2 | °C | 10 | confirmed (by elimination) | 18.0 |
 | `0x06F5` | 1781 | Heizkennlinie Min Vorlauf HK 2 | °C | 10 | confirmed | 20.0 |
 | `0x06F6` | 1782 | Heizkennlinie Max Vorlauf HK 2 | °C | 10 | confirmed | 35.0 |
 
