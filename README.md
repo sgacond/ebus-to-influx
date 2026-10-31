@@ -50,6 +50,10 @@ docker run -d --name ebus-to-influx --restart unless-stopped \
 
 Build locally: `docker build -t ebus-to-influx .`
 
+### Grafana
+
+`grafana/heatpump-dashboard.json` is the "Wärmepumpe" dashboard (Grafana 9, InfluxDB data source in Flux mode, uid `VFazOlvnk`). Import it via *Dashboards* → *Import*, or upload it through the API (`POST /api/dashboards/db` with `{"dashboard": …, "overwrite": true}`).
+
 ### Troubleshooting
 
 **`Connection to ebus.gacond.local:5000 lost (Connection refused)`**: the coupler accepts only one TCP client. Ask it for its status (UDP, see [ESERA coupler](#esera-coupler)):
