@@ -29,16 +29,24 @@ Note: in normal operation the control unit only polls outside, flow, hot water a
 
 ### Docker (NAS)
 
-On every push to `main`, the GitHub Action (`.github/workflows/build.yml`) runs the tests and publishes a multi-arch image (amd64 and arm64) to `ghcr.io/sgacond/ebus-to-influx:latest`. Tags `v*` additionally publish a versioned image.
+On every push to `main`, the GitHub Action (`.github/workflows/build.yml`) runs the tests and publishes a multi-arch image (amd64 and arm64) to `ghcr.io/sgacond/ebus-to-influx:latest`. Tags `v*` additionally publish a versioned image. The image is public, no registry login needed.
 
-On the NAS only `compose.yaml` and a `.env` are needed:
+Synology Container Manager:
+
+1. *Image* → *Add* → *Add from URL*: `ghcr.io/sgacond/ebus-to-influx`, tag `latest`
+2. Start it with *Run*, enable *auto-restart*, and set these environment variables:
+   - `Influx__Token`: InfluxDB token with write access to `home`
+   - `TZ`: `Europe/Zurich` (log timestamps only, InfluxDB gets UTC)
+   - optional `EBus__Host` / `Influx__Url` as IP addresses, if the `.local` names don't resolve in the container
+3. Update: pull the image again, then *Action* → *Reset* on the container (keeps the settings).
+
+Or via SSH:
 
 ```
-cp .env.example .env    # and set INFLUX_TOKEN
-docker compose pull && docker compose up -d
+docker run -d --name ebus-to-influx --restart unless-stopped \
+  -e Influx__Token=<token> -e TZ=Europe/Zurich \
+  ghcr.io/sgacond/ebus-to-influx:latest
 ```
-
-If the `.local` host names don't resolve inside the container, set `EBus__Host` and `Influx__Url` to IP addresses in `compose.yaml`.
 
 Build locally: `docker build -t ebus-to-influx .`
 
