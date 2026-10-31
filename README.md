@@ -47,9 +47,9 @@ Synology Container Manager:
    - `Influx__Token`: InfluxDB token with write access to `home`
    - `TZ`: `Europe/Zurich` (log timestamps only, InfluxDB gets UTC)
    - optional `EBus__Host` / `Influx__Url` as IP addresses, if the `.local` names don't resolve in the container
-3. Update: pull the image again, then *Action* → *Reset* on the container (keeps the settings).
+3. Update: pull the image again, then delete the container and create it again from the image with the same settings. A container keeps running its old image version, *Reset* does not switch it. After the update the log shows `Polling 24 values every 00:01:00 as bus master 0xFF`.
 
-Or via SSH:
+Or via SSH (update: `docker pull`, `docker rm -f ebus-to-influx`, then the same `run` again):
 
 ```
 docker run -d --name ebus-to-influx --restart unless-stopped \
