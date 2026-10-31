@@ -1,133 +1,209 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace EBusToInflux;
 
-namespace EBusToInflux;
-
+/// <summary>
+/// Byte-wise eBus telegram parser.
+/// Master part:  QQ ZZ PB SB NN DB1..DBn CRC, then ACK from receiver (unless broadcast)
+/// Slave answer: NN DB1..DBn CRC, then ACK from master (only if ZZ is a slave address)
+/// 0xA9 and 0xAA in the data are transmitted escaped as A9 00 / A9 01.
+/// </summary>
 internal class TelegramParser
 {
-    const int HeaderBytesLength = 5;
+    const byte Syn = 0xAA;
+    const byte Esc = 0xA9;
+    const byte Ack = 0x00;
+    const byte BroadcastAddress = 0xFE;
+    const int MaxDataLength = 16;
 
-    int headerToRead = 0;
-    int bodyToRead = 0;
-    private Telegram? curTelegram = null;
-    bool crcRead = false;
-    bool ackRead = false;
-    int? responseBytesToRead = null;
-    bool responseCRCRead = false;
+    static readonly byte[] CrcTable = BuildCrcTable();
+
+    enum State
+    {
+        WaitSyn, Idle, Receiver, PrimaryCommand, SecondaryCommand, Length, Data, Crc, Ack,
+        ResponseLength, ResponseData, ResponseCrc, ResponseAck, CompleteOnSyn
+    }
+
+    State state = State.Idle;
+    bool escapePending = false;
+    Telegram? curTelegram = null;
+    int bytesToRead = 0;
+    byte crc = 0;
+
+    /// <summary>Number of telegrams discarded because of CRC, NACK or framing errors.</summary>
+    public int ErrorCount { get; private set; }
 
     public Telegram? ContinueParse(byte b)
     {
-        if (curTelegram == null && b != 0xAA)
-        {
-            // start something new!
-            Reset();
-            curTelegram = new Telegram();
-            curTelegram.Sender = b;
-            headerToRead = HeaderBytesLength - 1;
-        }
-        else if (curTelegram != null)
-        {
-            if (headerToRead == 4)
-            {
-                curTelegram.Receiver = b;
-                headerToRead--;
-            }
-            else if (headerToRead == 3)
-            {
-                curTelegram.PrimaryCommand = b;
-                headerToRead--;
-            }
-            else if (headerToRead == 2)
-            {
-                curTelegram.SecondaryCommand = b;
-                headerToRead--;
-            }
-            else if (headerToRead == 1)
-            {
-                bodyToRead = b;
-                curTelegram.Payload = new List<byte>(b);
-                headerToRead--;
-            }
-            else if (bodyToRead > 0)
-            {
-                curTelegram.Payload.Add(b);
-                bodyToRead--;
-            }
-            else if (bodyToRead == 0 && headerToRead == 0)
-            {
-                if (responseBytesToRead > 0)
-                {
-                    curTelegram.ResponsePayload.Add(b);
-                    responseBytesToRead--;
-                }
-                else if (!crcRead)
-                {
-                    curTelegram.CRC = b;
-                    crcRead = true;
-                }
-                else if (!ackRead)
-                {
-                    if (b == 0x00)
-                        ackRead = true;
-                    else if (b == 0xAA)
-                    {
-                        var result = curTelegram;
-                        Reset();
-                        return result;
-                    }
-                    else
-                        Reset();
-                }
-                else if (crcRead && ackRead && responseBytesToRead == null)
-                {
-                    if(b != 0xAA)
-                    {
-                        responseBytesToRead = b;
-                        curTelegram.ResponsePayload = new List<byte>(b);
-                    }
-                    else
-                    {
-                        var result = curTelegram;
-                        Reset();
-                        return result;
-                    }
-                }
-                else if (!responseCRCRead && responseBytesToRead == 0)
-                {
-                    curTelegram.ResponseCRC = b;
-                    responseCRCRead = true;
-                }
-                else if (crcRead && ackRead && responseCRCRead)
-                {
-                    if (b == 0x00) // last ack!
-                    {
-                        var result = curTelegram;
-                        Reset();
-                        return result;
-                    }
-                    else
-                    {
-                        Reset();
-                    }
-                }
-            }
+        if (b == Syn)
+            return OnSyn();
 
+        if (state == State.WaitSyn)
+            return null;
+
+        if (escapePending)
+        {
+            escapePending = false;
+            if (b == 0x00)
+                b = Esc;
+            else if (b == 0x01)
+                b = Syn;
+            else
+                return Abort();
+        }
+        else if (b == Esc)
+        {
+            escapePending = true;
+            return null;
+        }
+
+        return OnSymbol(b);
+    }
+
+    private Telegram? OnSyn()
+    {
+        // broadcasts and master-master telegrams are only complete once the SYN follows
+        var result = state == State.CompleteOnSyn ? curTelegram : null;
+        if (state != State.Idle && state != State.WaitSyn && state != State.CompleteOnSyn)
+            ErrorCount++;
+        Reset(State.Idle);
+        return result;
+    }
+
+    private Telegram? OnSymbol(byte b)
+    {
+        switch (state)
+        {
+            case State.Idle:
+                curTelegram = new Telegram { Sender = b };
+                crc = UpdateCrc(0, b);
+                state = State.Receiver;
+                break;
+
+            case State.Receiver:
+                curTelegram!.Receiver = b;
+                crc = UpdateCrc(crc, b);
+                state = State.PrimaryCommand;
+                break;
+
+            case State.PrimaryCommand:
+                curTelegram!.PrimaryCommand = b;
+                crc = UpdateCrc(crc, b);
+                state = State.SecondaryCommand;
+                break;
+
+            case State.SecondaryCommand:
+                curTelegram!.SecondaryCommand = b;
+                crc = UpdateCrc(crc, b);
+                state = State.Length;
+                break;
+
+            case State.Length:
+                if (b > MaxDataLength)
+                    return Abort();
+                curTelegram!.Payload = new List<byte>(b);
+                crc = UpdateCrc(crc, b);
+                bytesToRead = b;
+                state = b == 0 ? State.Crc : State.Data;
+                break;
+
+            case State.Data:
+                curTelegram!.Payload.Add(b);
+                crc = UpdateCrc(crc, b);
+                if (--bytesToRead == 0)
+                    state = State.Crc;
+                break;
+
+            case State.Crc:
+                if (b != crc)
+                    return Abort();
+                curTelegram!.CRC = b;
+                state = curTelegram.Receiver == BroadcastAddress ? State.CompleteOnSyn : State.Ack;
+                break;
+
+            case State.Ack:
+                if (b != Ack)
+                    return Abort();
+                state = IsMasterAddress(curTelegram!.Receiver) ? State.CompleteOnSyn : State.ResponseLength;
+                break;
+
+            case State.ResponseLength:
+                if (b > MaxDataLength)
+                    return Abort();
+                curTelegram!.ResponsePayload = new List<byte>(b);
+                crc = UpdateCrc(0, b);
+                bytesToRead = b;
+                state = b == 0 ? State.ResponseCrc : State.ResponseData;
+                break;
+
+            case State.ResponseData:
+                curTelegram!.ResponsePayload!.Add(b);
+                crc = UpdateCrc(crc, b);
+                if (--bytesToRead == 0)
+                    state = State.ResponseCrc;
+                break;
+
+            case State.ResponseCrc:
+                if (b != crc)
+                    return Abort();
+                curTelegram!.ResponseCRC = b;
+                state = State.ResponseAck;
+                break;
+
+            case State.ResponseAck:
+                if (b != Ack)
+                    return Abort();
+                var result = curTelegram;
+                Reset(State.Idle);
+                return result;
+
+            case State.CompleteOnSyn:
+                return Abort();
         }
 
         return null;
     }
 
-    private void Reset()
+    private Telegram? Abort()
     {
-        headerToRead = 0;
-        bodyToRead = 0;
+        ErrorCount++;
+        Reset(State.WaitSyn);
+        return null;
+    }
+
+    private void Reset(State newState)
+    {
+        state = newState;
+        escapePending = false;
         curTelegram = null;
-        crcRead = false;
-        ackRead = false;
-        responseBytesToRead = null;
-        responseCRCRead = false;
+        bytesToRead = 0;
+        crc = 0;
+    }
+
+    /// <summary>Master addresses have both nibbles in {0x0, 0x1, 0x3, 0x7, 0xF}.</summary>
+    internal static bool IsMasterAddress(byte address) =>
+        IsMasterNibble(address >> 4) && IsMasterNibble(address & 0x0F);
+
+    static bool IsMasterNibble(int n) => n is 0x0 or 0x1 or 0x3 or 0x7 or 0xF;
+
+    /// <summary>The CRC is calculated over the escaped (transmitted) form of each byte.</summary>
+    static byte UpdateCrc(byte crc, byte value) => value switch
+    {
+        Esc => CrcStep(CrcStep(crc, Esc), 0x00),
+        Syn => CrcStep(CrcStep(crc, Esc), 0x01),
+        _ => CrcStep(crc, value),
+    };
+
+    static byte CrcStep(byte crc, byte value) => (byte)(CrcTable[crc] ^ value);
+
+    static byte[] BuildCrcTable()
+    {
+        var table = new byte[256];
+        for (var i = 0; i < 256; i++)
+        {
+            var c = i;
+            for (var bit = 0; bit < 8; bit++)
+                c = (c & 0x80) != 0 ? (c << 1) ^ 0x9B : c << 1;
+            table[i] = (byte)c;
+        }
+        return table;
     }
 }

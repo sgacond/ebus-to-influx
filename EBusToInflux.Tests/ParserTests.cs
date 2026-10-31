@@ -94,5 +94,80 @@ namespace EBusToInflux.Tests
             Assert.Equal(0xDE, result2!.CRC);
             Assert.Null(result2!.ResponsePayload);
         }
+
+        [Fact]
+        public void EscapedBytesAreUnstuffed()
+        {
+            var sut = new TelegramParser();
+            // payload A9 AA is transmitted as A9 00 A9 01
+            var bytes = new byte[] { 0xAA, 0x30, 0xF1, 0x50, 0x23, 0x02, 0xA9, 0x00, 0xA9, 0x01, 0x7D, 0x00, 0xAA };
+
+            Telegram? result = null;
+            foreach (var b in bytes)
+                result = sut.ContinueParse(b);
+
+            Assert.NotNull(result);
+            Assert.Equal(new List<byte> { 0xA9, 0xAA }, result!.Payload);
+            Assert.Equal(0x7D, result!.CRC);
+            Assert.Equal(0, sut.ErrorCount);
+        }
+
+        [Fact]
+        public void BroadcastWithoutAckWorks()
+        {
+            var sut = new TelegramParser();
+            var bytes = new byte[] { 0xAA, 0x10, 0xFE, 0x07, 0x00, 0x02, 0x12, 0x34, 0x46, 0xAA };
+
+            Telegram? result = null;
+            foreach (var b in bytes)
+                result = sut.ContinueParse(b);
+
+            Assert.NotNull(result);
+            Assert.Equal(0xFE, result!.Receiver);
+            Assert.Equal(new List<byte> { 0x12, 0x34 }, result!.Payload);
+            Assert.Null(result!.ResponsePayload);
+        }
+
+        [Fact]
+        public void WrongCrcIsDiscardedAndParserResyncs()
+        {
+            var sut = new TelegramParser();
+            // CRC corrupted (0xDF instead of 0xDE), followed by garbage before the next SYN
+            var broken = new byte[] { 0x30, 0xF1, 0x50, 0x23, 0x09, 0x44, 0x85, 0x02, 0x50, 0x00, 0x5D, 0x01, 0x00, 0x00, 0xDF, 0x00, 0x12, 0x34 };
+            var valid = new byte[] { 0xAA, 0x30, 0xF1, 0x50, 0x23, 0x09, 0x44, 0x85, 0x02, 0x50, 0x00, 0x5D, 0x01, 0x00, 0x00, 0xDE, 0x00, 0xAA };
+
+            foreach (var b in broken)
+                Assert.Null(sut.ContinueParse(b));
+
+            Telegram? result = null;
+            foreach (var b in valid)
+                result = sut.ContinueParse(b);
+
+            Assert.Equal(1, sut.ErrorCount);
+            Assert.NotNull(result);
+            Assert.Equal(0xDE, result!.CRC);
+        }
+
+        [Fact]
+        public void TruncatedTelegramIsDiscardedOnSyn()
+        {
+            var sut = new TelegramParser();
+            var bytes = new byte[] { 0x30, 0xF6, 0x50, 0x22, 0x03, 0xA6, 0xAA };
+
+            foreach (var b in bytes)
+                Assert.Null(sut.ContinueParse(b));
+
+            Assert.Equal(1, sut.ErrorCount);
+        }
+
+        [Theory]
+        [InlineData(0x30, true)]
+        [InlineData(0xF1, true)]
+        [InlineData(0x10, true)]
+        [InlineData(0xF6, false)]
+        [InlineData(0x08, false)]
+        [InlineData(0xFE, false)]
+        public void MasterAddressDetection(byte address, bool isMaster) =>
+            Assert.Equal(isMaster, TelegramParser.IsMasterAddress(address));
     }
 }

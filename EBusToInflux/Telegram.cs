@@ -7,10 +7,10 @@
         public byte PrimaryCommand { get; set; }
         public byte SecondaryCommand { get; set; }
         
-        public List<byte> Payload { get; set; }
+        public List<byte> Payload { get; set; } = new();
         public byte CRC { get; set; }
         
-        public List<byte> ResponsePayload { get; set; }
+        public List<byte>? ResponsePayload { get; set; }
         public byte ResponseCRC { get; set; }
 
         public override string ToString() =>

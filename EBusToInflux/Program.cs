@@ -30,6 +30,8 @@ Console.CancelKeyPress += (s, e) =>
 
 var buffer = new byte[256];
 var parser = new TelegramParser();
+var lastValues = new Dictionary<ushort, short>();
+var seenUnknown = new HashSet<string>();
 
 try
 {
@@ -43,7 +45,7 @@ try
         {
             var result = parser.ContinueParse(b);
             if (result != null)
-                Console.WriteLine("Telegram: {0}", result);
+                PrintIfChanged(result);
 
             //if (lagB == 0xAA && b != 0xAA)
             //    Console.WriteLine();
@@ -63,5 +65,27 @@ catch (OperationCanceledException)
 finally
 {
     client.Close();
-    Console.WriteLine("Done");
+    Console.WriteLine("Done, {0} invalid telegrams discarded", parser.ErrorCount);
+}
+
+// Probe output: one line per value whenever it is first seen or changes.
+void PrintIfChanged(Telegram telegram)
+{
+    var value = WeishauptDecoder.Decode(telegram);
+    if (value == null)
+    {
+        var signature = $"{telegram.Sender:X2}{telegram.Receiver:X2}{telegram.PrimaryCommand:X2}{telegram.SecondaryCommand:X2}";
+        if (seenUnknown.Add(signature))
+            Console.WriteLine("{0:HH:mm:ss}  unknown  {1}", DateTime.Now, telegram);
+        return;
+    }
+
+    var hadPrevious = lastValues.TryGetValue(value.Id, out var previous);
+    if (hadPrevious && previous == value.Raw)
+        return;
+
+    lastValues[value.Id] = value.Raw;
+    Console.WriteLine("{0:HH:mm:ss}  50{1:X2}  0x{2:X4} ({2,5})  {3,-20} {4,6} {5,8}{6}",
+        DateTime.Now, value.SecondaryCommand, value.Id, WeishauptDecoder.NameOf(value.Id),
+        value.Raw, value.IsAvailable ? value.Scaled.ToString("0.0") : "n/a", hadPrevious ? $"   (was {previous / 10.0:0.0})" : "");
 }
