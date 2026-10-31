@@ -12,17 +12,29 @@ dotnet run --project EBusToInflux
 
 Requires the .NET 10 SDK (see `global.json`). Tests: `dotnet test`.
 
-The app is a .NET Generic Host with a `BackgroundService` (`EBusProbe`) that reconnects automatically. The coupler is configured in the `EBus` section of `EBusToInflux/appsettings.json`, and can be overridden by environment variables (e.g. `EBus__Host`) or command-line arguments (e.g. `--EBus:Host=192.168.15.244`).
+The app is a .NET Generic Host with two background services, connected by a channel:
 
-The coupler accepts only **one** TCP client at a time, so stop other listeners first. The app prints one line per value when it is first seen and whenever it changes:
+- **`EBusListener`** reads the coupler, decodes the Weishaupt telegrams and reconnects automatically. It prints one line per value when it is first seen and whenever it changes:
+  ```
+  18:12:03  5023  0x06C2 ( 1730)  RoomTargetCooling                240  24 °C      (was 23.5)
+  ```
+  Columns: time, eBus command, parameter id (hex and decimal), name (`?` = not confirmed), raw value, scaled value, previous value.
+- **`InfluxWriter`** writes **measurements only** (not settings) to InfluxDB 2.x: immediately when a value changes, otherwise again every `RepeatInterval` (5 min) so graphs have no gaps. Each value is a field of the measurement `heatpump`, e.g. `heatpump OutsideTemperature=11.5`. Lines are batched every 10 s and kept for retry if InfluxDB is down.
+
+Configuration is in `EBusToInflux/appsettings.json` (sections `EBus` and `Influx`). It can be overridden by environment variables (`EBus__Host`, `Influx__Token`, …) or command-line arguments (`--EBus:Host=192.168.15.244`). **Writing is only enabled when `Influx:Token` is set.** The token never goes into the repo; use a token with write access to the bucket `home` only.
+
+The coupler accepts only **one** TCP client at a time, so stop other listeners first. The app only listens. **Anything written to the coupler's TCP port goes directly onto the heating bus.**
+
+Note: in normal operation the control unit only polls outside, flow, hot water and room temperature, heat pump state and frequency. The other measurements (refrigerant circuit, run times, …) only appear on the bus while the *Systeminfo* menu is open.
+
+### Docker (NAS)
 
 ```
-18:12:03  5023  0x06C2 ( 1730)  RoomTargetCooling       240     24.0   (was 23.5)
+cp .env.example .env    # and set INFLUX_TOKEN
+docker compose up -d --build
 ```
 
-Columns: time, eBus command, parameter id (hex and decimal), known name, raw value, value / 10, previous value.
-
-The app only listens. **Anything written to the coupler's TCP port goes directly onto the heating bus.**
+If the `.local` host names don't resolve inside the container, set `EBus__Host` and `Influx__Url` to IP addresses in `compose.yaml`.
 
 ## Hardware
 

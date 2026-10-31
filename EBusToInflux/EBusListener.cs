@@ -1,13 +1,17 @@
 using System.Net.Sockets;
+using System.Threading.Channels;
 using Microsoft.Extensions.Options;
 
 namespace EBusToInflux;
 
 /// <summary>
-/// Listens on the eBus coupler and prints every Weishaupt value when it is first seen or changes.
-/// Reconnects automatically if the connection drops. Read-only: nothing is ever sent to the bus.
+/// Listens on the eBus coupler, passes every decoded Weishaupt value on to the writer and prints it when it is
+/// first seen or changes. Reconnects automatically if the connection drops. Read-only: nothing is sent to the bus.
 /// </summary>
-internal sealed partial class EBusProbe(IOptions<EBusOptions> options, ILogger<EBusProbe> logger) : BackgroundService
+internal sealed partial class EBusListener(
+    IOptions<EBusOptions> options,
+    ChannelWriter<Reading> readings,
+    ILogger<EBusListener> logger) : BackgroundService
 {
     static readonly TimeSpan ReconnectDelay = TimeSpan.FromSeconds(10);
 
@@ -49,7 +53,7 @@ internal sealed partial class EBusProbe(IOptions<EBusOptions> options, ILogger<E
                 foreach (var b in buffer.AsSpan(0, read))
                 {
                     if (parser.ContinueParse(b) is { } telegram)
-                        PrintIfChanged(telegram);
+                        OnTelegram(telegram);
                 }
             }
             throw new IOException("Connection closed by the coupler");
@@ -60,8 +64,7 @@ internal sealed partial class EBusProbe(IOptions<EBusOptions> options, ILogger<E
         }
     }
 
-    // Probe output goes to stdout as a plain table, diagnostics go through the logger.
-    void PrintIfChanged(Telegram telegram)
+    void OnTelegram(Telegram telegram)
     {
         if (WeishauptDecoder.Decode(telegram) is not { } value)
         {
@@ -70,6 +73,9 @@ internal sealed partial class EBusProbe(IOptions<EBusOptions> options, ILogger<E
             return;
         }
 
+        readings.TryWrite(new Reading(DateTimeOffset.UtcNow, value));
+
+        // probe output goes to stdout as a plain table, diagnostics go through the logger
         var hadPrevious = lastValues.TryGetValue(value.Id, out var previous);
         if (hadPrevious && previous == value.Raw)
             return;
