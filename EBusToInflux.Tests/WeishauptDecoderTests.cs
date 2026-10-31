@@ -13,8 +13,8 @@ public class WeishauptDecoderTests
         Assert.NotNull(result);
         Assert.Equal(0x0641, result.Id);
         Assert.Equal(115, result.Raw);
-        Assert.Equal(11.5, result.Scaled);
-        Assert.Equal("OutsideTemperature", WeishauptDecoder.NameOf(result.Id));
+        Assert.Equal(11.5, result.Value);
+        Assert.Equal("OutsideTemperature", result.Parameter?.Name);
     }
 
     [Fact]
@@ -35,7 +35,20 @@ public class WeishauptDecoderTests
     {
         var telegram = new Telegram(0x30, 0xF6, 0x50, 0x22, [0x22, 0x41, 0x06], 0, [0xE2, 0xFF]);
 
-        Assert.Equal(-3.0, WeishauptDecoder.Decode(telegram)!.Scaled);
+        Assert.Equal(-3.0, WeishauptDecoder.Decode(telegram)!.Value);
+    }
+
+    [Fact]
+    public void KnownParameterUsesItsDivisor()
+    {
+        // compressor runtime 28890 h is not scaled
+        var telegram = new Telegram(0x30, 0xF6, 0x50, 0x22, [WeishauptDecoder.Checksum([0x50, 0x06]), 0x50, 0x06], 0, [0xDA, 0x70]);
+
+        var result = WeishauptDecoder.Decode(telegram);
+
+        Assert.NotNull(result);
+        Assert.Equal("CompressorRuntime", result.Parameter?.Name);
+        Assert.Equal(28890, result.Value);
     }
 
     [Fact]

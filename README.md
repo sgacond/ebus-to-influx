@@ -107,31 +107,77 @@ Observations:
 
 ## Known parameters
 
-Confirmed by comparing with the control unit, or by changing the value and watching the bus:
+The catalog lives in `EBusToInflux/WeishauptParameters.cs`, with name, display label, unit and divisor for each parameter. The probe marks unconfirmed names with `?`.
 
-| ID | Dec | Cmd | Name | Unit | Notes |
-|---|---|---|---|---|---|
-| `0x0641` | 1601 | read | Outside temperature | 0.1 °C | |
-| `0x0645` | 1605 | read | Heat pump state | code | 0 = off, 3 = Heizen |
-| `0x0648` | 1608 | read | Compressor frequency | 0.1 Hz | display shows whole Hz |
-| `0x0655` | 1621 | read | Flow temperature (Vorlauf) | 0.1 °C | |
-| `0x0658` | 1624 | read | Hot water temperature | 0.1 °C | sensor in the WAC 300 |
-| `0x06A5` | 1701 | write | Operating mode | code | 3 = Zeitprogramm 3 |
-| `0x06A7` | 1703 | write | Room target (active?) | 0.1 °C | followed room target 21.5 → 22.0 |
-| `0x06A8` | 1704 | write | Room temperature | 0.1 °C | |
-| `0x06B1` | 1713 | write | Hot water target | 0.1 °C | |
-| `0x06B4` | 1716 | write | Room target (active?) | 0.1 °C | followed room target 21.5 → 22.0 |
-| `0x06C1` | 1729 | write | Absenk Raum Heiz | 0.1 °C | |
-| `0x06C2` | 1730 | write | Raum Soll Kühl | 0.1 °C | |
+**Confirmed** means the value changed on the bus when it was changed on the control unit, or the control unit read it exactly while its menu page was open and the value is unique. **Likely** means matched only by value and position in the settings block.
 
-Likely, by value and position in the settings block:
+The control unit only reads the values it currently needs: a few in the background, the rest while the matching *Systeminfo* page is open.
 
-| ID | Dec | Name | Value seen |
-|---|---|---|---|
-| `0x06BF` | 1727 | Raum Soll Heiz | 22.0 |
-| `0x06C4` | 1732 | Absenk Raum Kühl | 28.0 |
+### Read from the heat pump (`50 22`)
 
-Read values not yet identified: `0x0199` (409) = 38.1. `0x065E`, `0x065F`, `0x0663`, `0x0666` (1630, 1631, 1635, 1638) were 0, even while heating.
+| ID | Dec | Label on control unit | Unit | ÷ | Status | Notes |
+|---|---|---|---|---|---|---|
+| `0x0641` | 1601 | Außen TO | °C | 10 | confirmed | |
+| `0x0642` | 1602 | Verdampfung TE | °C | 10 | confirmed | |
+| `0x0643` | 1603 | Sauggas TS | °C | 10 | confirmed | |
+| `0x0644` | 1604 | Druckgas TD | °C | 10 | confirmed | |
+| `0x0645` | 1605 | Status WP | code | 1 | confirmed | 0 = Aus, 3 = Heizen |
+| `0x0646` | 1606 | Max Frequenz | Hz | 10 | confirmed | 70 Hz |
+| `0x0647` | 1607 | Sollfrequenz | Hz | 10 | confirmed | |
+| `0x0648` | 1608 | Frequenz | Hz | 10 | confirmed | display shows whole Hz |
+| `0x0649` | 1609 | Leistung WP? | | | unclear | 15, display showed `----` |
+| `0x064A` | 1610 | Betriebsart? | code | 1 | likely | 3 |
+| `0x064B` | 1611 | Version WP (major) | | 1 | confirmed | 46 of 46.02 |
+| `0x064C` | 1612 | Version WP (minor) | | 1 | confirmed | 02 of 46.02 |
+| `0x064D` | 1613 | Solltemp VL HK 1 | °C | 10 | confirmed | |
+| `0x064E` | 1614 | Solltemp VL HK 2 | °C | 10 | confirmed | |
+| `0x064F` | 1615 | Durchfluss | bool | 1 | confirmed | 1 = Ja |
+| `0x0650` | 1616 | Laufzeit Verdichter | h | 1 | confirmed | 28890 |
+| `0x0651` | 1617 | Laufzeit Pumpe HK | h | 1 | confirmed | -1 |
+| `0x0652` | 1618 | Laufzeit E Heiz 1 | h | 1 | confirmed | |
+| `0x0653` | 1619 | Laufzeit E Heiz 2 | h | 1 | confirmed | |
+| `0x0654` | 1620 | Solltemp VL | °C | 10 | confirmed | |
+| `0x0655` | 1621 | Vorlauftemp | °C | 10 | confirmed | |
+| `0x0656` | 1622 | Verfl Temp | °C | 10 | confirmed | condenser |
+| `0x0657` | 1623 | Kältemitteltemp | °C | 10 | confirmed | |
+| `0x0658` | 1624 | WW Temp | °C | 10 | confirmed | sensor in the WAC 300 |
+| `0x0659`–`0x065B` | 1625–1627 | Weichentemp, Vorlauftemp 1, Vorlauftemp 2 | °C | 10 | likely | all 0, order assumed |
+
+Not identified: `0x0199` (409) = 38.1; `0x065D` (1629) = 512; `0x065E`, `0x065F`, `0x0663`, `0x0666` (1630, 1631, 1635, 1638) = 0. Not found on the bus: Störmeldungen, and Version WP-FS (the control unit's own version, 380.02).
+
+### Written by the control unit (`50 23`)
+
+| ID | Dec | Label on control unit | Unit | ÷ | Status | Value seen |
+|---|---|---|---|---|---|---|
+| `0x06A5` | 1701 | Betriebsart | code | 1 | confirmed | 3 = Zeitprogramm 3 |
+| `0x06A7` | 1703 | room target (active?) | °C | 10 | confirmed | follows Raumsoll Heiz |
+| `0x06A8` | 1704 | room temperature | °C | 10 | confirmed | |
+| `0x06B1` | 1713 | WW Solltemp | °C | 10 | confirmed | 54.0 |
+| `0x06B4` | 1716 | room target (active?) | °C | 10 | confirmed | follows Raumsoll Heiz |
+| `0x06B6` | 1718 | WP Leistung | % | 10 | confirmed | 75 |
+| `0x06B8` | 1720 | +/- VL HK 1 Heiz | °C | 10 | confirmed | -4.0 |
+| `0x06BF` | 1727 | Raumsoll Heiz | °C | 10 | likely | 22.0 |
+| `0x06C1` | 1729 | Absenk Raum Heiz | °C | 10 | confirmed | 16.0 |
+| `0x06C2` | 1730 | Raumsoll Kühl | °C | 10 | confirmed | 23.5 |
+| `0x06C4` | 1732 | Absenk Raum Kühl | °C | 10 | likely | 28.0 |
+| `0x06D1` / `0x06D5` | 1745 / 1749 | Bivalenztemp / Grenztemp WP | °C | 10 | likely, order unclear | -5.0 each |
+| `0x06D4` | 1748 | Hysterese VL (2. WE) | K | 10 | likely | 3.0 |
+| `0x06D6` | 1750 | Verzögerung (2. WE) | min | 1 | likely | 10 |
+| `0x06DD` | 1757 | Therm Desinfekt Solltemp | °C | 10 | confirmed | 65.0 |
+| `0x06DF` | 1759 | Therm Desinfekt Uhrzeit | h | 1 | confirmed | 14 |
+| `0x06E0` | 1760 | Therm Desinfekt Dauer | min | 1 | confirmed | 30 |
+| `0x06E1` | 1761 | Therm Desinfekt Max Zeit | h | 1 | confirmed | 4 |
+| `0x06EB` | 1771 | Heizkennlinie Aussen Min | °C | 10 | confirmed | -7.0 |
+| `0x06EC` | 1772 | Heizkennlinie Aussen Max | °C | 10 | likely | 18.0 |
+| `0x06ED` | 1773 | Heizkennlinie Min Vorlauf HK 1 | °C | 10 | confirmed | 23.0 |
+| `0x06EE` | 1774 | Heizkennlinie Max Vorlauf HK 1 | °C | 10 | confirmed | 37.0 |
+| `0x06EF` | 1775 | Kühlkennlinie Aussen Max | °C | 10 | confirmed | 40.0 |
+| `0x06F0` | 1776 | Kühlkennlinie Aussen Min | °C | 10 | likely | 22.0 |
+| `0x06F1`–`0x06F4` | 1777–1780 | Kühlkennlinie Min/Max Vorlauf HK 1/2 | °C | 10 | likely, order assumed | 18.0 each |
+| `0x06F5` | 1781 | Heizkennlinie Min Vorlauf HK 2 | °C | 10 | confirmed | 20.0 |
+| `0x06F6` | 1782 | Heizkennlinie Max Vorlauf HK 2 | °C | 10 | confirmed | 35.0 |
+
+Menu items not yet assigned (ambiguous values): +/- VL HK 1 Kühl (0.0), 2. Wärmeerzeuger (aktiv), 2. WE bei Störung (Nein), Anzahl 2. WE (02, candidates 1707, 1738, 1746), Prio (00), Zyklus (Therm Desinfekt).
 
 ### Settings block (1702–1804), raw values on 2026-10-31
 

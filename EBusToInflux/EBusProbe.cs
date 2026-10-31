@@ -75,10 +75,12 @@ internal sealed partial class EBusProbe(IOptions<EBusOptions> options, ILogger<E
             return;
 
         lastValues[value.Id] = value.Raw;
-        var scaled = value.IsAvailable ? value.Scaled.ToString("0.0") : "n/a";
-        var was = hadPrevious ? $"   (was {previous / 10.0:0.0})" : "";
+        var parameter = value.Parameter;
+        var name = parameter is null ? "" : parameter.Confirmed ? parameter.Name : parameter.Name + "?";
+        var shown = value.IsAvailable ? $"{value.Value:0.#} {parameter?.Unit}" : "n/a";
+        var was = hadPrevious ? $"   (was {(value with { Raw = previous }).Value:0.#})" : "";
         Console.WriteLine(
-            $"{DateTime.Now:HH:mm:ss}  50{value.SecondaryCommand:X2}  0x{value.Id:X4} ({value.Id,5})  {WeishauptDecoder.NameOf(value.Id),-20} {value.Raw,6} {scaled,8}{was}");
+            $"{DateTime.Now:HH:mm:ss}  50{value.SecondaryCommand:X2}  0x{value.Id:X4} ({value.Id,5})  {name,-28} {value.Raw,6}  {shown,-10}{was}");
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Connected to eBus coupler {Host}:{Port}")]

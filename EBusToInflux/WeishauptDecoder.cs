@@ -2,11 +2,12 @@ using System.Buffers.Binary;
 
 namespace EBusToInflux;
 
-/// <summary>A single value from a Weishaupt 0x50 telegram.</summary>
+/// <summary>A single value from a Weishaupt 0x50 telegram. Unknown parameters are scaled by 1/10.</summary>
 internal sealed record WeishauptValue(byte SecondaryCommand, ushort Id, short Raw)
 {
+    public WeishauptParameter? Parameter => WeishauptParameters.Find(Id);
     public bool IsAvailable => Raw != short.MinValue; // 0x8000 = not available
-    public double Scaled => Raw / 10.0;
+    public double Value => Raw / (double)(Parameter?.Divisor ?? 10);
 }
 
 /// <summary>
@@ -22,23 +23,6 @@ internal static class WeishauptDecoder
 {
     const byte ChecksumPolynomial = 0x5C;
 
-    // confirmed against the display of the control unit
-    public static readonly IReadOnlyDictionary<ushort, string> KnownNames = new Dictionary<ushort, string>
-    {
-        [0x0641] = "OutsideTemperature",
-        [0x0645] = "HeatPumpState",       // raw code: 0 = off, 3 = "Heizen"
-        [0x0648] = "CompressorFrequency", // 1/10 Hz
-        [0x0655] = "FlowTemperature",
-        [0x0658] = "HotWaterTemperature",
-        [0x06A5] = "OperatingMode",       // 3 = "Zeitprogramm 3", raw value (not /10)
-        [0x06A8] = "RoomTemperature",
-        [0x06B1] = "HotWaterTarget",
-        [0x06BF] = "RoomTargetHeating?",  // 22.0, by value
-        [0x06C1] = "ReducedRoomTargetHeating",
-        [0x06C2] = "RoomTargetCooling",
-        [0x06C4] = "ReducedRoomTargetCooling?", // 28.0, by value
-    };
-
     public static WeishauptValue? Decode(Telegram t)
     {
         if (t.PrimaryCommand != 0x50 || !HasValidChecksum(t.Payload))
@@ -51,8 +35,6 @@ internal static class WeishauptDecoder
             _ => null,
         };
     }
-
-    public static string NameOf(ushort id) => KnownNames.GetValueOrDefault(id, "");
 
     internal static bool HasValidChecksum(ReadOnlySpan<byte> payload) =>
         payload.Length > 1 && payload[0] == Checksum(payload[1..]);
