@@ -50,6 +50,17 @@ docker run -d --name ebus-to-influx --restart unless-stopped \
 
 Build locally: `docker build -t ebus-to-influx .`
 
+### Troubleshooting
+
+**`Connection to ebus.gacond.local:5000 lost (Connection refused)`**: the coupler accepts only one TCP client. Ask it for its status (UDP, see [ESERA coupler](#esera-coupler)):
+
+```
+python3 -c 'import socket;s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);s.settimeout(3);s.sendto(b"MA"+b"\xff"*6+b"\r\nPW \r\nST\r\n",("192.168.15.244",50001));print(s.recv(512)[10:].decode().split())'
+```
+
+- `STCONNECT`: another client is connected. Find and stop it, e.g. a forgotten `dotnet run` on a laptop (`lsof -nP -iTCP@192.168.15.244`) or a second container.
+- `STOPEN`: the coupler is free but still refuses, so its listener is stuck. Write the settings again with `SV` + `RT` (see below), a power cycle does not help.
+
 ## Hardware
 
 | Device | Details |
