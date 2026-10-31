@@ -1,6 +1,0 @@
-{
-  "ebus": {
-    "host": "ebus.gacond.local",
-    "port": 5000
-  }
-}

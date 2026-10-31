@@ -1,7 +1,9 @@
+using System.Buffers.Binary;
+
 namespace EBusToInflux;
 
 /// <summary>A single value from a Weishaupt 0x50 telegram.</summary>
-internal record WeishauptValue(byte SecondaryCommand, ushort Id, short Raw)
+internal sealed record WeishauptValue(byte SecondaryCommand, ushort Id, short Raw)
 {
     public bool IsAvailable => Raw != short.MinValue; // 0x8000 = not available
     public double Scaled => Raw / 10.0;
@@ -21,7 +23,7 @@ internal static class WeishauptDecoder
     const byte ChecksumPolynomial = 0x5C;
 
     // confirmed against the display of the control unit
-    public static readonly Dictionary<ushort, string> KnownNames = new()
+    public static readonly IReadOnlyDictionary<ushort, string> KnownNames = new Dictionary<ushort, string>
     {
         [0x0641] = "OutsideTemperature",
         [0x0645] = "HeatPumpState",       // raw code: 0 = off, 3 = "Heizen"
@@ -42,21 +44,20 @@ internal static class WeishauptDecoder
         if (t.PrimaryCommand != 0x50 || !HasValidChecksum(t.Payload))
             return null;
 
-        if (t.SecondaryCommand == 0x22 && t.Payload.Count == 3 && t.ResponsePayload?.Count == 2)
-            return new WeishauptValue(t.SecondaryCommand, ToUInt16(t.Payload, 1), (short)ToUInt16(t.ResponsePayload, 0));
-
-        if (t.SecondaryCommand == 0x23 && t.Payload.Count == 9)
-            return new WeishauptValue(t.SecondaryCommand, ToUInt16(t.Payload, 1), (short)ToUInt16(t.Payload, 3));
-
-        return null;
+        return (t.SecondaryCommand, t.Payload.Length, t.ResponsePayload?.Length) switch
+        {
+            (0x22, 3, 2) => new(t.SecondaryCommand, ReadId(t.Payload), BinaryPrimitives.ReadInt16LittleEndian(t.ResponsePayload!)),
+            (0x23, 9, _) => new(t.SecondaryCommand, ReadId(t.Payload), BinaryPrimitives.ReadInt16LittleEndian(t.Payload.AsSpan(3))),
+            _ => null,
+        };
     }
 
-    public static string NameOf(ushort id) => KnownNames.TryGetValue(id, out var name) ? name : "";
+    public static string NameOf(ushort id) => KnownNames.GetValueOrDefault(id, "");
 
-    internal static bool HasValidChecksum(List<byte> payload) =>
-        payload.Count > 1 && payload[0] == Checksum(payload.Skip(1));
+    internal static bool HasValidChecksum(ReadOnlySpan<byte> payload) =>
+        payload.Length > 1 && payload[0] == Checksum(payload[1..]);
 
-    internal static byte Checksum(IEnumerable<byte> data)
+    internal static byte Checksum(ReadOnlySpan<byte> data)
     {
         byte crc = 0;
         foreach (var b in data)
@@ -69,5 +70,5 @@ internal static class WeishauptDecoder
         return crc;
     }
 
-    static ushort ToUInt16(List<byte> bytes, int offset) => (ushort)(bytes[offset] | bytes[offset + 1] << 8);
+    static ushort ReadId(byte[] payload) => BinaryPrimitives.ReadUInt16LittleEndian(payload.AsSpan(1));
 }

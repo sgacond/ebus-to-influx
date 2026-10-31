@@ -10,7 +10,11 @@ There is no public eBus definition for this system, so everything below was reve
 dotnet run --project EBusToInflux
 ```
 
-Connects to the coupler (`ebus` section in `EBusToInflux/defaultConfig.json`, overridable via environment variables, e.g. `ebus__host`). It prints one line per value when it is first seen and whenever it changes:
+Requires the .NET 10 SDK (see `global.json`). Tests: `dotnet test`.
+
+The app is a .NET Generic Host with a `BackgroundService` (`EBusProbe`) that reconnects automatically. The coupler is configured in the `EBus` section of `EBusToInflux/appsettings.json`, and can be overridden by environment variables (e.g. `EBus__Host`) or command-line arguments (e.g. `--EBus:Host=192.168.15.244`).
+
+The coupler accepts only **one** TCP client at a time, so stop other listeners first. The app prints one line per value when it is first seen and whenever it changes:
 
 ```
 18:12:03  5023  0x06C2 ( 1730)  RoomTargetCooling       240     24.0   (was 23.5)

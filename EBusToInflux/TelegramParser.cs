@@ -6,7 +6,7 @@
 /// Slave answer: NN DB1..DBn CRC, then ACK from master (only if ZZ is a slave address)
 /// 0xA9 and 0xAA in the data are transmitted escaped as A9 00 / A9 01.
 /// </summary>
-internal class TelegramParser
+internal sealed class TelegramParser
 {
     const byte Syn = 0xAA;
     const byte Esc = 0xA9;
@@ -23,10 +23,14 @@ internal class TelegramParser
     }
 
     State state = State.Idle;
-    bool escapePending = false;
-    Telegram? curTelegram = null;
-    int bytesToRead = 0;
-    byte crc = 0;
+    bool escapePending;
+    int bytesToRead;
+    byte crc;
+
+    // telegram under construction
+    byte sender, receiver, primaryCommand, secondaryCommand, telegramCrc, responseCrc;
+    readonly List<byte> payload = [];
+    List<byte>? responsePayload;
 
     /// <summary>Number of telegrams discarded because of CRC, NACK or framing errors.</summary>
     public int ErrorCount { get; private set; }
@@ -42,12 +46,9 @@ internal class TelegramParser
         if (escapePending)
         {
             escapePending = false;
-            if (b == 0x00)
-                b = Esc;
-            else if (b == 0x01)
-                b = Syn;
-            else
+            if (b > 0x01)
                 return Abort();
+            b = b == 0x00 ? Esc : Syn;
         }
         else if (b == Esc)
         {
@@ -61,8 +62,8 @@ internal class TelegramParser
     private Telegram? OnSyn()
     {
         // broadcasts and master-master telegrams are only complete once the SYN follows
-        var result = state == State.CompleteOnSyn ? curTelegram : null;
-        if (state != State.Idle && state != State.WaitSyn && state != State.CompleteOnSyn)
+        var result = state == State.CompleteOnSyn ? Build() : null;
+        if (state is not (State.Idle or State.WaitSyn or State.CompleteOnSyn))
             ErrorCount++;
         Reset(State.Idle);
         return result;
@@ -73,25 +74,25 @@ internal class TelegramParser
         switch (state)
         {
             case State.Idle:
-                curTelegram = new Telegram { Sender = b };
+                sender = b;
                 crc = UpdateCrc(0, b);
                 state = State.Receiver;
                 break;
 
             case State.Receiver:
-                curTelegram!.Receiver = b;
+                receiver = b;
                 crc = UpdateCrc(crc, b);
                 state = State.PrimaryCommand;
                 break;
 
             case State.PrimaryCommand:
-                curTelegram!.PrimaryCommand = b;
+                primaryCommand = b;
                 crc = UpdateCrc(crc, b);
                 state = State.SecondaryCommand;
                 break;
 
             case State.SecondaryCommand:
-                curTelegram!.SecondaryCommand = b;
+                secondaryCommand = b;
                 crc = UpdateCrc(crc, b);
                 state = State.Length;
                 break;
@@ -99,14 +100,13 @@ internal class TelegramParser
             case State.Length:
                 if (b > MaxDataLength)
                     return Abort();
-                curTelegram!.Payload = new List<byte>(b);
                 crc = UpdateCrc(crc, b);
                 bytesToRead = b;
                 state = b == 0 ? State.Crc : State.Data;
                 break;
 
             case State.Data:
-                curTelegram!.Payload.Add(b);
+                payload.Add(b);
                 crc = UpdateCrc(crc, b);
                 if (--bytesToRead == 0)
                     state = State.Crc;
@@ -115,27 +115,27 @@ internal class TelegramParser
             case State.Crc:
                 if (b != crc)
                     return Abort();
-                curTelegram!.CRC = b;
-                state = curTelegram.Receiver == BroadcastAddress ? State.CompleteOnSyn : State.Ack;
+                telegramCrc = b;
+                state = receiver == BroadcastAddress ? State.CompleteOnSyn : State.Ack;
                 break;
 
             case State.Ack:
                 if (b != Ack)
                     return Abort();
-                state = IsMasterAddress(curTelegram!.Receiver) ? State.CompleteOnSyn : State.ResponseLength;
+                state = IsMasterAddress(receiver) ? State.CompleteOnSyn : State.ResponseLength;
                 break;
 
             case State.ResponseLength:
                 if (b > MaxDataLength)
                     return Abort();
-                curTelegram!.ResponsePayload = new List<byte>(b);
+                responsePayload = new List<byte>(b);
                 crc = UpdateCrc(0, b);
                 bytesToRead = b;
                 state = b == 0 ? State.ResponseCrc : State.ResponseData;
                 break;
 
             case State.ResponseData:
-                curTelegram!.ResponsePayload!.Add(b);
+                responsePayload!.Add(b);
                 crc = UpdateCrc(crc, b);
                 if (--bytesToRead == 0)
                     state = State.ResponseCrc;
@@ -144,14 +144,14 @@ internal class TelegramParser
             case State.ResponseCrc:
                 if (b != crc)
                     return Abort();
-                curTelegram!.ResponseCRC = b;
+                responseCrc = b;
                 state = State.ResponseAck;
                 break;
 
             case State.ResponseAck:
                 if (b != Ack)
                     return Abort();
-                var result = curTelegram;
+                var result = Build();
                 Reset(State.Idle);
                 return result;
 
@@ -161,6 +161,10 @@ internal class TelegramParser
 
         return null;
     }
+
+    private Telegram Build() =>
+        new(sender, receiver, primaryCommand, secondaryCommand, [.. payload], telegramCrc,
+            responsePayload is null ? null : [.. responsePayload], responseCrc);
 
     private Telegram? Abort()
     {
@@ -173,9 +177,11 @@ internal class TelegramParser
     {
         state = newState;
         escapePending = false;
-        curTelegram = null;
         bytesToRead = 0;
         crc = 0;
+        payload.Clear();
+        responsePayload = null;
+        responseCrc = 0;
     }
 
     /// <summary>Master addresses have both nibbles in {0x0, 0x1, 0x3, 0x7, 0xF}.</summary>
@@ -197,7 +203,7 @@ internal class TelegramParser
     static byte[] BuildCrcTable()
     {
         var table = new byte[256];
-        for (var i = 0; i < 256; i++)
+        for (var i = 0; i < table.Length; i++)
         {
             var c = i;
             for (var bit = 0; bit < 8; bit++)

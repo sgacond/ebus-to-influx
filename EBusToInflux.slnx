@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="EBusToInflux.Tests/EBusToInflux.Tests.csproj" />
+  <Project Path="EBusToInflux/EBusToInflux.csproj" />
+</Solution>
