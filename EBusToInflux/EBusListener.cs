@@ -6,7 +6,8 @@ namespace EBusToInflux;
 
 /// <summary>
 /// Listens on the eBus coupler, passes every decoded Weishaupt value on to the writer and prints it when it is
-/// first seen or changes. Reconnects automatically if the connection drops. Read-only: nothing is sent to the bus.
+/// first seen or changes. Reconnects automatically if the connection drops. If a poll interval is configured,
+/// the <see cref="BusPoller"/> additionally sends read requests for all measurements; nothing else is ever sent.
 /// </summary>
 internal sealed partial class EBusListener(
     IOptions<EBusOptions> options,
@@ -44,15 +45,19 @@ internal sealed partial class EBusListener(
 
         await using var stream = client.GetStream();
         var parser = new TelegramParser();
+        var poller = CreatePoller();
         var buffer = new byte[256];
         try
         {
             int read;
             while ((read = await stream.ReadAsync(buffer, cancellationToken)) > 0)
             {
-                foreach (var b in buffer.AsSpan(0, read))
+                for (var i = 0; i < read; i++)
                 {
-                    if (parser.ContinueParse(b) is { } telegram)
+                    if (poller?.OnByte(buffer[i], DateTimeOffset.UtcNow) is { Length: > 0 } toSend)
+                        await stream.WriteAsync(toSend, cancellationToken);
+
+                    if (parser.ContinueParse(buffer[i]) is { } telegram)
                         OnTelegram(telegram);
                 }
             }
@@ -61,7 +66,24 @@ internal sealed partial class EBusListener(
         finally
         {
             LogDiscarded(logger, parser.ErrorCount);
+            if (poller is not null)
+                LogPollStatistics(logger, poller.Completed, poller.Failed, poller.LostArbitrations);
         }
+    }
+
+    BusPoller? CreatePoller()
+    {
+        var settings = options.Value;
+        if (settings.PollInterval <= TimeSpan.Zero)
+            return null;
+
+        // parameters read from the heat pump (50 22); the ones from 0x06A0 on are written by the control unit
+        ushort[] ids = [.. WeishauptParameters.Known
+            .Where(p => p.Value.Kind == ParameterKind.Measurement && p.Key < 0x06A0)
+            .Select(p => p.Key)
+            .Order()];
+        LogPolling(logger, ids.Length, settings.PollInterval, settings.MasterAddress);
+        return new BusPoller(settings.MasterAddress, settings.HeatPumpAddress, ids, settings.PollInterval);
     }
 
     void OnTelegram(Telegram telegram)
@@ -94,6 +116,12 @@ internal sealed partial class EBusListener(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Connection to {Host}:{Port} lost ({Reason}), retrying in {Delay}")]
     static partial void LogConnectionLost(ILogger logger, string host, int port, string reason, TimeSpan delay);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Polling {Count} values every {Interval} as bus master 0x{Address:X2}")]
+    static partial void LogPolling(ILogger logger, int count, TimeSpan interval, byte address);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Poll requests: {Completed} answered, {Failed} failed, {Lost} lost arbitration")]
+    static partial void LogPollStatistics(ILogger logger, int completed, int failed, int lost);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "{Count} invalid telegrams discarded")]
     static partial void LogDiscarded(ILogger logger, int count);

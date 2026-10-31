@@ -190,6 +190,31 @@ internal sealed class TelegramParser
 
     static bool IsMasterNibble(int n) => n is 0x0 or 0x1 or 0x3 or 0x7 or 0xF;
 
+    /// <summary>eBus CRC over unescaped data, as transmitted (escape sequences included).</summary>
+    internal static byte ComputeCrc(ReadOnlySpan<byte> data)
+    {
+        byte result = 0;
+        foreach (var b in data)
+            result = UpdateCrc(result, b);
+        return result;
+    }
+
+    /// <summary>Byte stuffing for transmission: A9 → A9 00, AA → A9 01.</summary>
+    internal static byte[] Escape(ReadOnlySpan<byte> data)
+    {
+        var result = new List<byte>(data.Length + 2);
+        foreach (var b in data)
+        {
+            switch (b)
+            {
+                case Esc: result.AddRange([Esc, 0x00]); break;
+                case Syn: result.AddRange([Esc, 0x01]); break;
+                default: result.Add(b); break;
+            }
+        }
+        return [.. result];
+    }
+
     /// <summary>The CRC is calculated over the escaped (transmitted) form of each byte.</summary>
     static byte UpdateCrc(byte crc, byte value) => value switch
     {

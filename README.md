@@ -23,9 +23,18 @@ The app is a .NET Generic Host with two background services, connected by a chan
 
 Configuration is in `EBusToInflux/appsettings.json` (sections `EBus` and `Influx`). It can be overridden by environment variables (`EBus__Host`, `Influx__Token`, …) or command-line arguments (`--EBus:Host=192.168.15.244`). **Writing is only enabled when `Influx:Token` is set.** The token never goes into the repo; use a token with write access to the bucket `home` only.
 
-The coupler accepts only **one** TCP client at a time, so stop other listeners first. The app only listens. **Anything written to the coupler's TCP port goes directly onto the heating bus.**
+The coupler accepts only **one** TCP client at a time, so stop other listeners first. **Anything written to the coupler's TCP port goes directly onto the heating bus.** The app only ever sends read requests (`50 22`), never writes settings.
 
-Note: in normal operation the control unit only polls outside, flow, hot water and room temperature, heat pump state and frequency. The other measurements (refrigerant circuit, run times, …) only appear on the bus while the *Systeminfo* menu is open.
+### Active polling
+
+Without someone using the control unit, it only reads the heat pump state now and then; the temperatures, frequency and run times only appear on the bus while its menus are open. So the `BusPoller` reads all measurements of the catalog itself, every `EBus:PollInterval` (1 minute, `00:00:00` disables sending entirely):
+
+- own master address `0xFF` (lowest arbitration priority, unused on this bus), target `0xF6`
+- one request at a time, only after at least two SYN in a row, so other masters always get the bus first
+- arbitration: the own address is sent right after a SYN and has to come back unchanged, otherwise another master won and the request waits for the next idle bus
+- any deviation (wrong echo, no ACK, wrong CRC, timeout) drops the request with a SYN; it is retried in the next cycle
+
+The answers are decoded like any other telegram. A cycle of 24 values takes about 10 seconds.
 
 ### Docker (NAS)
 
