@@ -36,32 +36,35 @@ Without someone using the control unit, it only reads the heat pump state now an
 
 The answers are decoded like any other telegram. A cycle of 24 values takes about 10 seconds.
 
-### Docker (NAS)
+### Docker (platy)
 
 On every push to `main`, the GitHub Action (`.github/workflows/build.yml`) runs the tests and publishes a multi-arch image (amd64 and arm64) to `ghcr.io/sgacond/ebus-to-influx:latest`. Tags `v*` additionally publish a versioned image. The image is public, no registry login needed.
 
-Synology Container Manager:
+It runs on the Raspberry Pi `platy` (CM5, arm64) as a Docker Compose stack, managed with Dockge (`http://platy.gacond.local:5001`). InfluxDB runs on the same host. The stack lives in `/mnt/ssd/stacks/ebus-to-influx/compose.yaml`:
 
-1. *Image* → *Add* → *Add from URL*: `ghcr.io/sgacond/ebus-to-influx`, tag `latest`
-2. Start it with *Run*, enable *auto-restart*, and set these environment variables:
-   - `Influx__Token`: InfluxDB token with write access to `home`
-   - `TZ`: `Europe/Zurich` (log timestamps only, InfluxDB gets UTC)
-   - optional `EBus__Host` / `Influx__Url` as IP addresses, if the `.local` names don't resolve in the container
-3. Update: pull the image again, then delete the container and create it again from the image with the same settings. A container keeps running its old image version, *Reset* does not switch it. After the update the log shows `Polling 24 values every 00:01:00 as bus master 0xFF`.
-
-Or via SSH (update: `docker pull`, `docker rm -f ebus-to-influx`, then the same `run` again):
-
+```yaml
+services:
+  ebus-to-influx:
+    image: ghcr.io/sgacond/ebus-to-influx:latest
+    container_name: ebus-to-influx
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Zurich                              # log timestamps only, InfluxDB gets UTC
+      - Influx__Url=http://host.docker.internal:8086  # InfluxDB on the same host
+      - Influx__Token=<token>                         # write access to `home`
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    dns_search:
+      - gacond.local
 ```
-docker run -d --name ebus-to-influx --restart unless-stopped \
-  -e Influx__Token=<token> -e TZ=Europe/Zurich \
-  ghcr.io/sgacond/ebus-to-influx:latest
-```
+
+Update: *Update* on the stack in Dockge, or via SSH `cd /mnt/ssd/stacks/ebus-to-influx && docker compose pull && docker compose up -d`. This recreates the container with the new image. After the update the log shows `Polling 24 values every 00:01:00 as bus master 0xFF`.
 
 Build locally: `docker build -t ebus-to-influx .`
 
 ### Grafana
 
-`grafana/heatpump-dashboard.json` is the "Wärmepumpe" dashboard (Grafana 9, InfluxDB data source in Flux mode, uid `VFazOlvnk`). Import it via *Dashboards* → *Import*, or upload it through the API (`POST /api/dashboards/db` with `{"dashboard": …, "overwrite": true}`).
+`grafana/heatpump-dashboard.json` is the "Wärmepumpe" dashboard (created with Grafana 9, runs on Grafana 13 on `platy`, InfluxDB data source in Flux mode, uid `VFazOlvnk`). Import it via *Dashboards* → *Import*, or upload it through the API (`POST /api/dashboards/db` with `{"dashboard": …, "overwrite": true}`).
 
 ### Troubleshooting
 
